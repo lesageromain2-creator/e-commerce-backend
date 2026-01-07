@@ -82,9 +82,7 @@ const authLimiter = rateLimit({
   message: 'Trop de tentatives de connexion, veuillez réessayer dans 15 minutes.'
 });
 
-// ============================================
-// MIDDLEWARE CORS
-// ============================================
+
 // ============================================
 // MIDDLEWARE CORS
 // ============================================
@@ -96,6 +94,7 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
+  'https://restaurant-frontend-eta-two.vercel.app', 
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -295,3 +294,5 @@ process.on('uncaughtException', (error) => {
 });
 
 module.exports = app;
+
+
