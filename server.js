@@ -32,11 +32,17 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://restaurant-frontend-466bzhl3i-devros-projects.vercel.app',
       'http://restaurant-frontend-git-main-devros-projects.vercel.app',
       'http://restaurant-frontend-eta-two.vercel.app',
-    
-     
     ];
 
-console.log('🌍 Origines autorisées:', allowedOrigins);
+// Patterns dynamiques pour Vercel et localhost
+const allowedPatterns = [
+  /^https:\/\/restaurant-frontend.*\.vercel\.app$/,  // Tous les preview deployments Vercel
+  /^http:\/\/localhost:\d+$/,                        // Tous les ports localhost
+  /^http:\/\/127\.0\.0\.1:\d+$/,                     // Localhost via IP
+];
+
+console.log('🌍 Origines fixes autorisées:', allowedOrigins);
+console.log('🔍 Patterns dynamiques activés: Vercel wildcard + localhost');
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -48,13 +54,21 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // Vérifier les origines fixes
     if (allowedOrigins.includes(origin)) {
-      console.log('✅ Origin autorisée:', origin);
+      console.log('✅ Origin autorisée (fixe):', origin);
+      return callback(null, true);
+    }
+    
+    // Vérifier les patterns dynamiques
+    const matchesPattern = allowedPatterns.some(pattern => pattern.test(origin));
+    if (matchesPattern) {
+      console.log('✅ Origin autorisée (pattern):', origin);
       return callback(null, true);
     }
     
     console.log('❌ Origin refusée:', origin);
-    console.log('📋 Origines disponibles:', allowedOrigins);
+    console.log('📋 Origines fixes disponibles:', allowedOrigins);
     return callback(null, false);
   },
   credentials: true,
@@ -67,7 +81,7 @@ app.use(cors({
 // Gérer explicitement les requêtes OPTIONS (preflight)
 app.options('*', (req, res) => {
   const origin = req.headers.origin;
-  if (!origin || allowedOrigins.includes(origin)) {
+  if (!origin || allowedOrigins.includes(origin) || allowedPatterns.some(pattern => pattern.test(origin))) {
     res.header('Access-Control-Allow-Origin', origin || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
@@ -200,7 +214,8 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'API Restaurant - Serveur opérationnel',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    cors: 'Vercel wildcard + fixed origins enabled'
   });
 });
 
@@ -211,7 +226,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     session: req.session.userId ? 'active' : 'none',
-    database: 'connected'
+    database: 'connected',
+    cors: 'wildcard enabled'
   });
 });
 
@@ -276,6 +292,11 @@ const server = app.listen(PORT, () => {
   console.log(`║  🌍 Environment: ${process.env.NODE_ENV || 'development'}        ║`);
   console.log(`║  🔗 URL: http://localhost:${PORT}       ║`);
   console.log('╚══════════════════════════════════════╝');
+  console.log('');
+  console.log('🔒 CORS Configuration:');
+  console.log('  ✅ Vercel wildcard enabled');
+  console.log('  ✅ Localhost all ports enabled');
+  console.log('  ✅ Fixed origins enabled');
   console.log('');
   console.log('📋 Routes disponibles:');
   console.log('  - GET  /');
