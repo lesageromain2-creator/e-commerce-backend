@@ -1,8 +1,9 @@
-// backend/routes/dishes.js
+// backend/routes/dishes.js - VERSION JWT
 const express = require('express');
 const router = express.Router();
+const { requireAdmin } = require('../middleware/auths');
 
-// GET /dishes - Récupérer tous les plats
+// GET /dishes - Récupérer tous les plats (PUBLIC)
 router.get('/', async (req, res) => {
   try {
     const pool = req.app.locals.pool;
@@ -29,37 +30,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /dishes/:id - Récupérer un plat par ID
-router.get('/:id', async (req, res) => {
-  try {
-    const pool = req.app.locals.pool;
-    const { id } = req.params;
-
-    const result = await pool.query(`
-      SELECT 
-        d.*,
-        c.name as category_name,
-        c.icon as category_icon
-      FROM dishes d
-      LEFT JOIN categories c ON d.category_id = c.id_category
-      WHERE d.id_dish = $1
-    `, [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Plat non trouvé' });
-    }
-
-    res.json({
-      success: true,
-      dish: result.rows[0]
-    });
-  } catch (error) {
-    console.error('❌ Erreur GET /dishes/:id:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET /dishes/search - Rechercher des plats
+// GET /dishes/search - Rechercher des plats (PUBLIC)
 router.get('/search', async (req, res) => {
   try {
     const pool = req.app.locals.pool;
@@ -95,14 +66,40 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// POST /dishes - Créer un plat (admin uniquement)
-router.post('/', async (req, res) => {
+// GET /dishes/:id - Récupérer un plat par ID (PUBLIC)
+router.get('/:id', async (req, res) => {
   try {
     const pool = req.app.locals.pool;
+    const { id } = req.params;
 
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
+    const result = await pool.query(`
+      SELECT 
+        d.*,
+        c.name as category_name,
+        c.icon as category_icon
+      FROM dishes d
+      LEFT JOIN categories c ON d.category_id = c.id_category
+      WHERE d.id_dish = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Plat non trouvé' });
     }
+
+    res.json({
+      success: true,
+      dish: result.rows[0]
+    });
+  } catch (error) {
+    console.error('❌ Erreur GET /dishes/:id:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /dishes - Créer un plat (ADMIN JWT)
+router.post('/', requireAdmin, async (req, res) => {
+  try {
+    const pool = req.app.locals.pool;
 
     const {
       name,
@@ -148,15 +145,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /dishes/:id - Mettre à jour un plat (admin uniquement)
-router.put('/:id', async (req, res) => {
+// PUT /dishes/:id - Mettre à jour un plat (ADMIN JWT)
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const pool = req.app.locals.pool;
     const { id } = req.params;
-
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
 
     const {
       name,
@@ -213,15 +206,11 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /dishes/:id - Supprimer un plat (admin uniquement)
-router.delete('/:id', async (req, res) => {
+// DELETE /dishes/:id - Supprimer un plat (ADMIN JWT)
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const pool = req.app.locals.pool;
     const { id } = req.params;
-
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
 
     const result = await pool.query(
       'DELETE FROM dishes WHERE id_dish = $1 RETURNING id_dish',

@@ -1,18 +1,12 @@
+// backend/routes/favorites.js - VERSION JWT
 const express = require('express');
 const router = express.Router();
-
-// Middleware d'authentification
-const requireAuth = (req, res, next) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({ error: 'Non authentifié' });
-  }
-  next();
-};
+const { requireAuth } = require('../middleware/auths');
 
 // GET /favorites - Liste des favoris
 router.get('/', requireAuth, async (req, res) => {
   const pool = req.app.locals.pool;
-  const userId = req.session.userId;
+  const userId = req.userId; // ✅ JWT au lieu de req.session.userId
 
   try {
     const result = await pool.query(`
@@ -55,7 +49,7 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /favorites - Ajouter un favori
 router.post('/', requireAuth, async (req, res) => {
   const pool = req.app.locals.pool;
-  const userId = req.session.userId;
+  const userId = req.userId; // ✅ JWT
   const { dishId } = req.body;
 
   console.log('📥 POST /favorites:', { userId, dishId });
@@ -105,7 +99,7 @@ router.post('/', requireAuth, async (req, res) => {
 // DELETE /favorites/:dishId - Retirer un favori
 router.delete('/:dishId', requireAuth, async (req, res) => {
   const pool = req.app.locals.pool;
-  const userId = req.session.userId;
+  const userId = req.userId; // ✅ JWT
   const { dishId } = req.params;
 
   console.log('🗑️ DELETE /favorites:', { userId, dishId });
@@ -133,7 +127,7 @@ router.delete('/:dishId', requireAuth, async (req, res) => {
 // GET /favorites/check/:dishId - Vérifier si favori
 router.get('/check/:dishId', requireAuth, async (req, res) => {
   const pool = req.app.locals.pool;
-  const userId = req.session.userId;
+  const userId = req.userId; // ✅ JWT
   const { dishId } = req.params;
 
   try {
@@ -155,7 +149,7 @@ router.get('/check/:dishId', requireAuth, async (req, res) => {
 // GET /favorites/count - Nombre de favoris
 router.get('/count', requireAuth, async (req, res) => {
   const pool = req.app.locals.pool;
-  const userId = req.session.userId;
+  const userId = req.userId; // ✅ JWT
 
   try {
     const result = await pool.query(

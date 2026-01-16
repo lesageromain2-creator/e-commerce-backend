@@ -1,15 +1,15 @@
-// backend/routes/categories.js - VERSION CORRIGÉE POUR POSTGRESQL
+// backend/routes/categories.js - VERSION JWT
 const express = require('express');
 const router = express.Router();
+const { requireAuth, requireAdmin } = require('../middleware/auths');
 
-// Récupérer toutes les catégories avec comptage de plats
+// Récupérer toutes les catégories avec comptage de plats (PUBLIC)
 router.get('/', async (req, res) => {
   const pool = req.app.locals.pool;
   
   try {
     const { limit = 50 } = req.query;
 
-    // ✅ CORRECTION: Syntaxe PostgreSQL avec $1 au lieu de ?
     const result = await pool.query(`
       SELECT 
         c.*,
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Récupérer une catégorie par ID
+// Récupérer une catégorie par ID (PUBLIC)
 router.get('/:id', async (req, res) => {
   const pool = req.app.locals.pool;
   
@@ -64,7 +64,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Récupérer les plats d'une catégorie
+// Récupérer les plats d'une catégorie (PUBLIC)
 router.get('/:id/dishes', async (req, res) => {
   const pool = req.app.locals.pool;
   
@@ -90,15 +90,11 @@ router.get('/:id/dishes', async (req, res) => {
   }
 });
 
-// Créer une catégorie (admin uniquement)
-router.post('/', async (req, res) => {
+// Créer une catégorie (ADMIN JWT)
+router.post('/', requireAdmin, async (req, res) => {
   const pool = req.app.locals.pool;
   
   try {
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-
     const { name, description, icon, display_order } = req.body;
 
     if (!name) {
@@ -122,15 +118,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Mettre à jour une catégorie (admin uniquement)
-router.put('/:id', async (req, res) => {
+// Mettre à jour une catégorie (ADMIN JWT)
+router.put('/:id', requireAdmin, async (req, res) => {
   const pool = req.app.locals.pool;
   
   try {
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-
     const { name, description, icon, display_order, is_active } = req.body;
 
     const result = await pool.query(`
@@ -161,15 +153,11 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Supprimer une catégorie (admin uniquement)
-router.delete('/:id', async (req, res) => {
+// Supprimer une catégorie (ADMIN JWT)
+router.delete('/:id', requireAdmin, async (req, res) => {
   const pool = req.app.locals.pool;
   
   try {
-    if (!req.session.userId || req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-
     // Vérifier si des plats utilisent cette catégorie
     const dishCheck = await pool.query(
       'SELECT COUNT(*) as count FROM dishes WHERE category_id = $1',
