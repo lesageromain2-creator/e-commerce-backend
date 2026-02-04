@@ -39,6 +39,7 @@ const adminContactRoutes = require('./routes/admin/contacts');
 const adminProjectsRoutes = require('./routes/admin/projects');
 const adminReservationsRoutes = require('./routes/admin/reservations');
 const adminDashboardRoutes = require('./routes/admin/dashboard');
+const adminHotelRoutes = require('./routes/admin/hotel');
 const messagesRoutes = require('./routes/admin/messages');
 const contactRoutes = require('./routes/contact');
 const projectFilesRouter = require('./routes/projectFiles');
@@ -449,6 +450,7 @@ app.use('/admin/messages', messagesRoutes);
 app.use('/admin/projects', adminProjectsRoutes);
 app.use('/admin/reservations', adminReservationsRoutes);
 app.use('/admin/dashboard', adminDashboardRoutes);
+app.use('/admin/hotel', adminHotelRoutes);
 
 // ============================================
 // GESTION ERREURS 404

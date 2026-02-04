@@ -30,7 +30,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
           u.avatar_url as user_avatar,
           a.firstname as admin_firstname,
           a.lastname as admin_lastname,
-          p.title as project_title,
+          NULL::text as project_title,
           (
             SELECT message FROM chat_messages 
             WHERE conversation_id = c.id 
@@ -43,7 +43,6 @@ router.get('/conversations', requireAuth, async (req, res) => {
         FROM chat_conversations c
         JOIN users u ON c.user_id = u.id
         LEFT JOIN users a ON c.admin_id = a.id
-        LEFT JOIN client_projects p ON c.project_id = p.id
         WHERE c.status != 'archived'
         ORDER BY c.last_message_at DESC
       `;
@@ -56,7 +55,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
           a.firstname as admin_firstname,
           a.lastname as admin_lastname,
           a.avatar_url as admin_avatar,
-          p.title as project_title,
+          NULL::text as project_title,
           (
             SELECT message FROM chat_messages 
             WHERE conversation_id = c.id 
@@ -68,7 +67,6 @@ router.get('/conversations', requireAuth, async (req, res) => {
           )::int as unread_count
         FROM chat_conversations c
         LEFT JOIN users a ON c.admin_id = a.id
-        LEFT JOIN client_projects p ON c.project_id = p.id
         WHERE c.user_id = $1 AND c.status != 'archived'
         ORDER BY c.last_message_at DESC
       `;
@@ -428,7 +426,7 @@ router.get('/admin/all', requireAuth, requireStaff, async (req, res) => {
         u.company_name as user_company,
         a.firstname as admin_firstname,
         a.lastname as admin_lastname,
-        p.title as project_title,
+        NULL::text as project_title,
         (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = c.id) as message_count,
         (
           SELECT message FROM chat_messages 
@@ -438,7 +436,6 @@ router.get('/admin/all', requireAuth, requireStaff, async (req, res) => {
       FROM chat_conversations c
       JOIN users u ON c.user_id = u.id
       LEFT JOIN users a ON c.admin_id = a.id
-      LEFT JOIN client_projects p ON c.project_id = p.id
       WHERE 1=1
     `;
     

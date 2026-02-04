@@ -3,7 +3,10 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, optionalAuth } = require('../middleware/auths');
 
-const getHotelId = (req) => req.query.hotel_id || req.body?.hotel_id || process.env.DEFAULT_HOTEL_ID;
+// UUID par défaut (migration 20260205000000_seed_default_hotel_fixed_id.sql)
+const DEFAULT_HOTEL_UUID = 'b2178a5e-9a4f-4c8d-9e1b-2a3c4d5e6f70';
+const getHotelId = (req) =>
+  req.query.hotel_id || req.body?.hotel_id || process.env.DEFAULT_HOTEL_ID || req.app?.locals?.defaultHotelId || DEFAULT_HOTEL_UUID;
 
 const query = async (pool, sql, params = []) => {
   const result = await pool.query(sql, params);
@@ -50,37 +53,7 @@ router.get('/rooms', async (req, res) => {
   }
 });
 
-router.get('/rooms/:id', async (req, res) => {
-  const pool = req.app.locals.pool;
-  try {
-    const row = await queryOne(pool,
-      'SELECT * FROM room_types WHERE id = $1 AND is_active = true',
-      [req.params.id]
-    );
-    if (!row) return res.status(404).json({ error: 'Type de chambre non trouvé' });
-    const pricings = await query(pool,
-      'SELECT * FROM room_pricings WHERE room_type_id = $1 AND end_date >= CURRENT_DATE ORDER BY start_date',
-      [req.params.id]
-    );
-    res.json({ ...row, pricings });
-  } catch (e) {
-    console.error('hotel room detail:', e);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Prix pour une nuit donnée (base ou tarif période)
-function getPriceForDate(pricings, basePrice, date) {
-  const d = new Date(date);
-  const match = pricings.find(p => {
-    const start = new Date(p.start_date);
-    const end = new Date(p.end_date);
-    return d >= start && d <= end;
-  });
-  return match ? Number(match.price_per_night) : Number(basePrice);
-}
-
-// Disponibilité et calcul du prix pour une période
+// IMPORTANT: /rooms/availability doit être avant /rooms/:id pour ne pas matcher "availability" comme UUID
 router.get('/rooms/availability', async (req, res) => {
   const pool = req.app.locals.pool;
   const hotelId = getHotelId(req);
@@ -150,6 +123,36 @@ router.get('/rooms/availability', async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+
+router.get('/rooms/:id', async (req, res) => {
+  const pool = req.app.locals.pool;
+  try {
+    const row = await queryOne(pool,
+      'SELECT * FROM room_types WHERE id = $1 AND is_active = true',
+      [req.params.id]
+    );
+    if (!row) return res.status(404).json({ error: 'Type de chambre non trouvé' });
+    const pricings = await query(pool,
+      'SELECT * FROM room_pricings WHERE room_type_id = $1 AND end_date >= CURRENT_DATE ORDER BY start_date',
+      [req.params.id]
+    );
+    res.json({ ...row, pricings });
+  } catch (e) {
+    console.error('hotel room detail:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Prix pour une nuit donnée (base ou tarif période)
+function getPriceForDate(pricings, basePrice, date) {
+  const d = new Date(date);
+  const match = pricings.find(p => {
+    const start = new Date(p.start_date);
+    const end = new Date(p.end_date);
+    return d >= start && d <= end;
+  });
+  return match ? Number(match.price_per_night) : Number(basePrice);
+}
 
 // ============================================
 // OPTIONS (petit-déjeuner, etc.)

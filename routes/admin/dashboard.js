@@ -327,13 +327,12 @@ router.get('/users', async (req, res) => {
     let query = `
       SELECT 
         u.*,
-        COUNT(DISTINCT p.id) as projects_count,
+        0::bigint as projects_count,
         COUNT(DISTINCT r.id) as reservations_count,
-        SUM(p.total_price) as total_spent,
-        MAX(p.created_at) as last_project_date,
+        NULL::numeric as total_spent,
+        NULL::timestamptz as last_project_date,
         MAX(r.created_at) as last_reservation_date
       FROM users u
-      LEFT JOIN client_projects p ON u.id = p.user_id
       LEFT JOIN reservations r ON u.id = r.user_id
       WHERE u.role = 'client'
     `;
