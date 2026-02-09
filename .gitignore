@@ -16,6 +16,9 @@ bower_components/
 .env.*.local
 *.pem
 *.key
+.env.exemple.local
+.env.exemple
+
 
 # Logs & runtime
 logs/
