@@ -25,9 +25,9 @@ CREATE TABLE IF NOT EXISTS categories (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_categories_slug ON categories(slug);
-CREATE INDEX idx_categories_active ON categories(is_active);
-CREATE INDEX idx_categories_parent ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
+CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active);
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
 
 -- ============================================
 -- TABLE: brands
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS brands (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_brands_slug ON brands(slug);
-CREATE INDEX idx_brands_active ON brands(is_active);
+CREATE INDEX IF NOT EXISTS idx_brands_slug ON brands(slug);
+CREATE INDEX IF NOT EXISTS idx_brands_active ON brands(is_active);
 
 -- ============================================
 -- TABLE: products
@@ -106,12 +106,12 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_products_sku ON products(sku);
-CREATE INDEX idx_products_slug ON products(slug);
-CREATE INDEX idx_products_category ON products(category_id);
-CREATE INDEX idx_products_brand ON products(brand_id);
-CREATE INDEX idx_products_status ON products(status);
-CREATE INDEX idx_products_featured ON products(is_featured);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand_id);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_featured ON products(is_featured);
 
 -- ============================================
 -- TABLE: product_variants
@@ -141,8 +141,8 @@ CREATE TABLE IF NOT EXISTS product_variants (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_variants_product ON product_variants(product_id);
-CREATE INDEX idx_variants_sku ON product_variants(sku);
+CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id);
+CREATE INDEX IF NOT EXISTS idx_variants_sku ON product_variants(sku);
 
 -- ============================================
 -- TABLE: inventory_movements
@@ -159,10 +159,10 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_inventory_product ON inventory_movements(product_id);
-CREATE INDEX idx_inventory_variant ON inventory_movements(variant_id);
-CREATE INDEX idx_inventory_type ON inventory_movements(type);
-CREATE INDEX idx_inventory_created ON inventory_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_movements(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_variant ON inventory_movements(variant_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_type ON inventory_movements(type);
+CREATE INDEX IF NOT EXISTS idx_inventory_created ON inventory_movements(created_at);
 
 -- ============================================
 -- TABLE: carts
@@ -176,8 +176,8 @@ CREATE TABLE IF NOT EXISTS carts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_carts_user ON carts(user_id);
-CREATE INDEX idx_carts_session ON carts(session_id);
+CREATE INDEX IF NOT EXISTS idx_carts_user ON carts(user_id);
+CREATE INDEX IF NOT EXISTS idx_carts_session ON carts(session_id);
 
 -- ============================================
 -- TABLE: cart_items
@@ -192,8 +192,8 @@ CREATE TABLE IF NOT EXISTS cart_items (
   added_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_cart_items_cart ON cart_items(cart_id);
-CREATE INDEX idx_cart_items_product ON cart_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product ON cart_items(product_id);
 
 -- ============================================
 -- TABLE: orders
@@ -248,12 +248,12 @@ CREATE TABLE IF NOT EXISTS orders (
   cancelled_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_orders_number ON orders(order_number);
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_orders_email ON orders(guest_email);
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_payment_status ON orders(payment_status);
-CREATE INDEX idx_orders_created ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(guest_email);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 
 -- ============================================
 -- TABLE: order_items
@@ -276,8 +276,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_order_items_product ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
 
 -- ============================================
 -- TABLE: order_status_history
@@ -292,8 +292,8 @@ CREATE TABLE IF NOT EXISTS order_status_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_order_status_order ON order_status_history(order_id);
-CREATE INDEX idx_order_status_created ON order_status_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_order_status_order ON order_status_history(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_status_created ON order_status_history(created_at);
 
 -- ============================================
 -- TABLE: coupons
@@ -329,8 +329,8 @@ CREATE TABLE IF NOT EXISTS coupons (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_coupons_code ON coupons(code);
-CREATE INDEX idx_coupons_active ON coupons(is_active);
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons(is_active);
 
 -- ============================================
 -- TABLE: coupon_usage
@@ -344,9 +344,9 @@ CREATE TABLE IF NOT EXISTS coupon_usage (
   used_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_coupon_usage_coupon ON coupon_usage(coupon_id);
-CREATE INDEX idx_coupon_usage_user ON coupon_usage(user_id);
-CREATE INDEX idx_coupon_usage_order ON coupon_usage(order_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_coupon ON coupon_usage(coupon_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_user ON coupon_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_order ON coupon_usage(order_id);
 
 -- ============================================
 -- TABLE: promotions
@@ -367,9 +367,9 @@ CREATE TABLE IF NOT EXISTS promotions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_promotions_active ON promotions(is_active);
-CREATE INDEX idx_promotions_type ON promotions(type);
-CREATE INDEX idx_promotions_dates ON promotions(starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions(is_active);
+CREATE INDEX IF NOT EXISTS idx_promotions_type ON promotions(type);
+CREATE INDEX IF NOT EXISTS idx_promotions_dates ON promotions(starts_at, ends_at);
 
 -- ============================================
 -- TABLE: product_reviews
@@ -398,10 +398,10 @@ CREATE TABLE IF NOT EXISTS product_reviews (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_reviews_product ON product_reviews(product_id);
-CREATE INDEX idx_reviews_user ON product_reviews(user_id);
-CREATE INDEX idx_reviews_approved ON product_reviews(is_approved);
-CREATE INDEX idx_reviews_created ON product_reviews(created_at);
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON product_reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_approved ON product_reviews(is_approved);
+CREATE INDEX IF NOT EXISTS idx_reviews_created ON product_reviews(created_at);
 
 -- ============================================
 -- TABLE: wishlist_items
@@ -416,8 +416,8 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
   UNIQUE(user_id, product_id)
 );
 
-CREATE INDEX idx_wishlist_user ON wishlist_items(user_id);
-CREATE INDEX idx_wishlist_product ON wishlist_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_user ON wishlist_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_product ON wishlist_items(product_id);
 
 -- ============================================
 -- TABLE: support_tickets
@@ -449,10 +449,10 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tickets_number ON support_tickets(ticket_number);
-CREATE INDEX idx_tickets_user ON support_tickets(user_id);
-CREATE INDEX idx_tickets_status ON support_tickets(status);
-CREATE INDEX idx_tickets_assigned ON support_tickets(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tickets_number ON support_tickets(ticket_number);
+CREATE INDEX IF NOT EXISTS idx_tickets_user ON support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON support_tickets(assigned_to);
 
 -- ============================================
 -- TABLE: ticket_messages
@@ -468,8 +468,8 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_ticket_messages_ticket ON ticket_messages(ticket_id);
-CREATE INDEX idx_ticket_messages_sender ON ticket_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_messages_sender ON ticket_messages(sender_id);
 
 -- ============================================
 -- TABLE: return_requests
@@ -497,9 +497,9 @@ CREATE TABLE IF NOT EXISTS return_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_returns_order ON return_requests(order_id);
-CREATE INDEX idx_returns_user ON return_requests(user_id);
-CREATE INDEX idx_returns_status ON return_requests(status);
+CREATE INDEX IF NOT EXISTS idx_returns_order ON return_requests(order_id);
+CREATE INDEX IF NOT EXISTS idx_returns_user ON return_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_returns_status ON return_requests(status);
 
 -- ============================================
 -- TABLE: customer_addresses
@@ -529,8 +529,8 @@ CREATE TABLE IF NOT EXISTS customer_addresses (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_addresses_user ON customer_addresses(user_id);
-CREATE INDEX idx_addresses_default ON customer_addresses(is_default);
+CREATE INDEX IF NOT EXISTS idx_addresses_user ON customer_addresses(user_id);
+CREATE INDEX IF NOT EXISTS idx_addresses_default ON customer_addresses(is_default);
 
 -- ============================================
 -- TRIGGERS : updated_at automatique
@@ -543,17 +543,40 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_brands_updated_at ON brands;
 CREATE TRIGGER update_brands_updated_at BEFORE UPDATE ON brands FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_product_variants_updated_at ON product_variants;
 CREATE TRIGGER update_product_variants_updated_at BEFORE UPDATE ON product_variants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_carts_updated_at ON carts;
 CREATE TRIGGER update_carts_updated_at BEFORE UPDATE ON carts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_coupons_updated_at ON coupons;
 CREATE TRIGGER update_coupons_updated_at BEFORE UPDATE ON coupons FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_promotions_updated_at ON promotions;
 CREATE TRIGGER update_promotions_updated_at BEFORE UPDATE ON promotions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_product_reviews_updated_at ON product_reviews;
 CREATE TRIGGER update_product_reviews_updated_at BEFORE UPDATE ON product_reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_support_tickets_updated_at ON support_tickets;
 CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON support_tickets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_return_requests_updated_at ON return_requests;
 CREATE TRIGGER update_return_requests_updated_at BEFORE UPDATE ON return_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_customer_addresses_updated_at ON customer_addresses;
 CREATE TRIGGER update_customer_addresses_updated_at BEFORE UPDATE ON customer_addresses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================

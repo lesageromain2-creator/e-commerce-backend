@@ -1,4 +1,4 @@
-// backend/routes/auth.js - VERSION JWT
+// backend/routes/auth.js - VERSION JWT (Compatible avec schéma Supabase)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -90,27 +90,14 @@ const getClientIp = (req) => {
 };
 
 const isAccountLocked = async (pool, email) => {
-  const maxAttempts = parseInt(process.env.MAX_LOGIN_ATTEMPTS) || 5;
-  const lockoutDuration = parseInt(process.env.LOCKOUT_DURATION_MINUTES) || 15;
-  
-  const result = await pool.query(
-    `SELECT COUNT(*) as attempts 
-     FROM login_attempts 
-     WHERE email = $1 
-     AND success = false 
-     AND attempted_at > NOW() - INTERVAL '${lockoutDuration} minutes'`,
-    [email]
-  );
-  
-  return parseInt(result.rows[0].attempts) >= maxAttempts;
+  // Désactivé - table login_attempts non présente dans le schéma
+  return false;
 };
 
 const logLoginAttempt = async (pool, email, ip, success, userAgent) => {
-  await pool.query(
-    `INSERT INTO login_attempts (email, ip_address, success, user_agent) 
-     VALUES ($1, $2, $3, $4)`,
-    [email, ip, success, userAgent]
-  );
+  // Désactivé - table login_attempts non présente dans le schéma
+  // Pour réactiver, créer la table login_attempts dans Supabase
+  console.log(`📊 Login attempt: ${email} - ${success ? 'SUCCESS' : 'FAILED'} - IP: ${ip}`);
 };
 
 // ============================================
@@ -162,31 +149,39 @@ router.post('/register', async (req, res) => {
     // Hash du mot de passe
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Créer l'utilisateur
+    // Créer l'utilisateur (combiner firstname et lastname en name pour le schéma)
+    const fullName = `${firstname} ${lastname}`.trim();
+    
     const result = await pool.query(`
       INSERT INTO users (
         email, 
         password_hash, 
-        firstname, 
-        lastname, 
-        company_name, 
+        name, 
         phone, 
         role,
         is_active,
-        email_verified
+        email_verified,
+        metadata
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'client', true, false)
-      RETURNING id, email, firstname, lastname, company_name, phone, role, created_at
+      VALUES ($1, $2, $3, $4, 'user', true, false, $5)
+      RETURNING id, email, name, phone, role, created_at
     `, [
       email.toLowerCase(), 
       passwordHash, 
-      firstname, 
-      lastname, 
-      company_name || null, 
-      phone || null
+      fullName,
+      phone || null,
+      JSON.stringify({ 
+        firstname, 
+        lastname, 
+        company_name: company_name || null 
+      })
     ]);
 
     const user = result.rows[0];
+    
+    // Extraire firstname/lastname du metadata pour compatibilité
+    user.firstname = firstname;
+    user.lastname = lastname;
 
     // 🔥 ENVOYER EMAIL DE BIENVENUE
     sendWelcomeEmail(user).catch(err => {
@@ -194,12 +189,7 @@ router.post('/register', async (req, res) => {
       // On ne bloque pas l'inscription si l'email échoue
     });
 
-    // Créer préférences email par défaut
-    await pool.query(`
-      INSERT INTO email_preferences (user_id)
-      VALUES ($1)
-      ON CONFLICT (user_id) DO NOTHING
-    `, [user.id]);
+    // Note: email_preferences désactivé - table non présente dans le schéma
 
     // Générer token JWT
     const token = jwt.sign(
@@ -263,7 +253,7 @@ router.post('/login', async (req, res) => {
     
     // Récupérer l'utilisateur
     const result = await pool.query(
-      `SELECT id, email, password_hash, firstname, lastname, role, is_active 
+      `SELECT id, email, password_hash, name, role, is_active, metadata 
        FROM users 
        WHERE email = $1`,
       [email.toLowerCase()]
@@ -300,7 +290,7 @@ router.post('/login', async (req, res) => {
     
     // Mettre à jour dernière connexion
     await pool.query(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
+      'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1',
       [user.id]
     );
     
@@ -309,14 +299,22 @@ router.post('/login', async (req, res) => {
     
     console.log(`✅ Connexion réussie: ${user.email} (IP: ${clientIp})`);
     
+    // Extraire firstname/lastname du metadata ou du name
+    const metadata = user.metadata || {};
+    const nameParts = (user.name || '').split(' ');
+    const firstname = metadata.firstname || nameParts[0] || '';
+    const lastname = metadata.lastname || nameParts.slice(1).join(' ') || '';
+    
     // Réponse avec token
     res.json({
+      success: true,
       message: 'Connexion réussie',
       token,
       user: {
         id: user.id,
-        firstname: user.firstname,
-        lastname: user.lastname,
+        firstname,
+        lastname,
+        name: user.name,
         email: user.email,
         role: user.role
       }
@@ -351,8 +349,8 @@ router.get('/me', requireAuth, async (req, res) => {
   
   try {
     const result = await pool.query(
-      `SELECT id, firstname, lastname, email, role, phone, avatar_url, 
-              email_verified, created_at, last_login 
+      `SELECT id, name, email, role, phone, image as avatar_url, 
+              email_verified, created_at, last_login_at as last_login, metadata
        FROM users 
        WHERE id = $1`,
       [req.userId]
@@ -362,7 +360,19 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
     
-    res.json({ user: result.rows[0] });
+    const user = result.rows[0];
+    const metadata = user.metadata || {};
+    const nameParts = (user.name || '').split(' ');
+    
+    // Retourner l'utilisateur avec firstname/lastname pour compatibilité
+    res.json({ 
+      success: true,
+      user: {
+        ...user,
+        firstname: metadata.firstname || nameParts[0] || '',
+        lastname: metadata.lastname || nameParts.slice(1).join(' ') || ''
+      }
+    });
     
   } catch (error) {
     console.error('❌ Erreur récupération utilisateur:', error);
@@ -434,7 +444,7 @@ router.post('/forgot-password', async (req, res) => {
 
     // Chercher l'utilisateur
     const result = await pool.query(
-      'SELECT id, email, firstname, lastname FROM users WHERE email = $1',
+      'SELECT id, email, name, metadata FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
@@ -453,16 +463,16 @@ router.post('/forgot-password', async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 3600000); // 1 heure
 
-    // Supprimer les anciens tokens de cet utilisateur
+    // Supprimer les anciens tokens de réinitialisation de cet utilisateur
     await pool.query(
-      'DELETE FROM password_reset_tokens WHERE user_id = $1',
-      [user.id]
+      'DELETE FROM verification_tokens WHERE user_id = $1 AND type = $2',
+      [user.id, 'password_reset']
     );
 
     // Sauvegarder le nouveau token
     await pool.query(`
-      INSERT INTO password_reset_tokens (user_id, token, expires_at, used)
-      VALUES ($1, $2, $3, false)
+      INSERT INTO verification_tokens (user_id, token, type, expires_at)
+      VALUES ($1, $2, 'password_reset', $3)
     `, [user.id, resetToken, expiresAt]);
 
     // 🔥 ENVOYER EMAIL DE RESET
@@ -508,16 +518,15 @@ router.post('/reset-password', async (req, res) => {
     // Vérifier le token
     const tokenResult = await pool.query(`
       SELECT 
-        prt.id as token_id,
-        prt.user_id,
-        prt.expires_at,
-        prt.used,
+        vt.id as token_id,
+        vt.user_id,
+        vt.expires_at,
         u.email,
-        u.firstname,
-        u.lastname
-      FROM password_reset_tokens prt
-      JOIN users u ON prt.user_id = u.id
-      WHERE prt.token = $1
+        u.name,
+        u.metadata
+      FROM verification_tokens vt
+      JOIN users u ON vt.user_id = u.id
+      WHERE vt.token = $1 AND vt.type = 'password_reset'
     `, [token]);
 
     if (tokenResult.rows.length === 0) {
@@ -527,13 +536,6 @@ router.post('/reset-password', async (req, res) => {
     }
 
     const tokenData = tokenResult.rows[0];
-
-    // Vérifier si déjà utilisé
-    if (tokenData.used) {
-      return res.status(400).json({ 
-        error: 'Ce lien a déjà été utilisé' 
-      });
-    }
 
     // Vérifier si expiré
     if (new Date(tokenData.expires_at) < new Date()) {
@@ -551,9 +553,9 @@ router.post('/reset-password', async (req, res) => {
       [passwordHash, tokenData.user_id]
     );
 
-    // Marquer le token comme utilisé
+    // Supprimer le token après utilisation
     await pool.query(
-      'UPDATE password_reset_tokens SET used = true WHERE id = $1',
+      'DELETE FROM verification_tokens WHERE id = $1',
       [tokenData.token_id]
     );
 
@@ -594,10 +596,11 @@ router.post('/issue-token-for-session', async (req, res) => {
   const nameParts = (name || '').trim().split(/\s+/);
   const firstname = nameParts[0] || emailNorm.split('@')[0] || 'Utilisateur';
   const lastname = nameParts.slice(1).join(' ') || '';
+  const fullName = name || `${firstname} ${lastname}`.trim();
 
   try {
     let result = await pool.query(
-      'SELECT id, email, role FROM users WHERE email = $1',
+      'SELECT id, email, name, role, metadata FROM users WHERE email = $1',
       [emailNorm]
     );
 
@@ -606,19 +609,21 @@ router.post('/issue-token-for-session', async (req, res) => {
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const insertResult = await pool.query(
         `INSERT INTO users (
-          email, password_hash, firstname, lastname, role, is_active, email_verified
-        ) VALUES ($1, $2, $3, $4, 'client', true, true)
-        RETURNING id, email, firstname, lastname, role`,
-        [emailNorm, passwordHash, firstname, lastname]
+          email, password_hash, name, role, is_active, email_verified, metadata
+        ) VALUES ($1, $2, $3, 'user', true, true, $4)
+        RETURNING id, email, name, role, metadata`,
+        [emailNorm, passwordHash, fullName, JSON.stringify({ firstname, lastname })]
       );
       user = insertResult.rows[0];
-      await pool.query(
-        'INSERT INTO email_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-        [user.id]
-      );
     } else {
       user = result.rows[0];
     }
+    
+    // Extraire firstname/lastname pour compatibilité
+    const metadata = user.metadata || {};
+    const userNameParts = (user.name || '').split(' ');
+    user.firstname = metadata.firstname || userNameParts[0] || '';
+    user.lastname = metadata.lastname || userNameParts.slice(1).join(' ') || '';
 
     const token = generateToken(user);
     res.json({

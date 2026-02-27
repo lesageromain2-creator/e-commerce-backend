@@ -31,9 +31,9 @@ const searchProducts = async (query, db) => {
   try {
     const result = await db.query(
       `SELECT 
-        id, name, slug, short_description, price, 
-        compare_at_price, featured_image, stock_quantity,
-        category_name, brand_name
+        p.id, p.name, p.slug, p.short_description, p.price, 
+        p.compare_at_price, p.featured_image, p.stock_quantity,
+        c.name AS category_name, b.name AS brand_name
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN brands b ON p.brand_id = b.id
@@ -204,6 +204,15 @@ const sendMessage = async (message, threadId, db) => {
     throw new Error('OPENAI_ASSISTANT_ID not configured');
   }
 
+  // Détecter le placeholder (ex: asst_VOTRE_ASSISTANT_ID)
+  if (ASSISTANT_ID.includes('VOTRE_ASSISTANT') || ASSISTANT_ID === 'asst_') {
+    const e = new Error(
+      'Assistant non configuré : remplacez OPENAI_ASSISTANT_ID dans .env par un ID réel. Créez un assistant via POST /chatbot/setup-assistant (admin).'
+    );
+    e.code = 'ASSISTANT_NOT_CONFIGURED';
+    throw e;
+  }
+
   try {
     // Créer ou récupérer thread
     const thread = await createOrGetThread(threadId);
@@ -279,24 +288,24 @@ const createAssistant = async () => {
 
   try {
     const assistant = await openai.beta.assistants.create({
-      name: 'Assistant E-commerce VotreShop',
-      instructions: `Tu es un assistant virtuel pour une boutique e-commerce.
+      name: 'Assistant EcamSap',
+      instructions: `Tu es l'assistant virtuel d'EcamSap, boutique de vêtements de seconde main à Lyon. Notre slogan : "Seconde main, premier choix". Nous proposons des vêtements vintage et de qualité (Levi's, Ralph Lauren, jeans vintage, etc.) à petits prix, pour les étudiants et les Lyonnais.
 
-Tu peux aider les clients à :
-- Trouver des produits spécifiques
-- Obtenir des recommandations
-- Vérifier le statut de leurs commandes
-- Répondre aux questions sur les produits
-- Expliquer les politiques de retour et de livraison
+## Rôle
+- Aider à trouver des produits (jeans, polos, vintage, marques…)
+- Donner des recommandations selon le style ou la marque
+- Vérifier le statut des commandes (numéro type ORD-YYYYMMDD-0001)
+- Expliquer comment commander, récupérer une commande, retourner un article
 
-Informations boutique :
-- Livraison gratuite à partir de 50€
-- Retours gratuits sous 30 jours
-- Paiement sécurisé par Stripe
-- Support client disponible 7j/7
+## Informations EcamSap
+- **Remise** : en main propre uniquement – Vieux Lyon et Presqu'île. Pas de livraison postale.
+- **Paiement** : carte bancaire en ligne ou sur place lors de la remise.
+- **Retours** : 14 jours après remise. Article non porté, non lavé, avec étiquettes. Contacter contact@ecamsap.fr avant tout envoi.
+- **Nouveautés** : nouveaux produits chaque semaine.
+- **Contact** : contact@ecamsap.fr
 
-Sois toujours courtois, concis et professionnel.
-Si tu ne connais pas la réponse, dirige le client vers le support humain.`,
+## Ton
+Courtois, concis, chaleureux. Adapte-toi à un public étudiant et local. Utilise les outils search_products et get_order_status quand pertinent. Si tu n'as pas l'info, oriente vers contact@ecamsap.fr ou les pages /faq et /retours.`,
       model: 'gpt-4-turbo-preview',
       tools: [
         {

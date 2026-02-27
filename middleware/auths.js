@@ -236,12 +236,20 @@ const optionalAuth = async (req, res, next) => {
     
     try {
       const result = await pool.query(
-        'SELECT id, email, firstname, lastname, role FROM users WHERE id = $1',
+        'SELECT id, email, name, role, metadata FROM users WHERE id = $1',
         [decoded.userId]
       );
       
       if (result.rows.length > 0) {
-        req.user = result.rows[0];
+        const user = result.rows[0];
+        const metadata = user.metadata || {};
+        const nameParts = (user.name || '').split(' ');
+        
+        req.user = {
+          ...user,
+          firstname: metadata.firstname || nameParts[0] || '',
+          lastname: metadata.lastname || nameParts.slice(1).join(' ') || ''
+        };
         req.userId = decoded.userId;
         req.userEmail = decoded.email;
         req.userRole = decoded.role;
@@ -275,15 +283,23 @@ const attachUser = async (req, res, next) => {
   
   try {
     const result = await pool.query(
-      `SELECT id, email, firstname, lastname, role, is_active, 
-              email_verified, avatar_url, created_at 
+      `SELECT id, email, name, role, is_active, 
+              email_verified, image as avatar_url, created_at, metadata
        FROM users 
        WHERE id = $1`,
       [decoded.userId]
     );
     
     if (result.rows.length > 0) {
-      req.user = result.rows[0];
+      const user = result.rows[0];
+      const metadata = user.metadata || {};
+      const nameParts = (user.name || '').split(' ');
+      
+      req.user = {
+        ...user,
+        firstname: metadata.firstname || nameParts[0] || '',
+        lastname: metadata.lastname || nameParts.slice(1).join(' ') || ''
+      };
       req.userId = decoded.userId;
       req.userEmail = decoded.email;
       req.userRole = decoded.role;

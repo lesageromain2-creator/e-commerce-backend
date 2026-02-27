@@ -9,8 +9,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { db } = require('../database/db');
-const { verifyToken, isAdmin } = require('../middleware/auths');
+const { db, getPool } = require('../database/db');
+const { requireAuth, requireAdmin, isAdmin, optionalAuth } = require('../middleware/auths');
 const { z } = require('zod');
 
 // ============================================
@@ -19,6 +19,7 @@ const { z } = require('zod');
 const addressSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
+  email: z.string().email().optional(),
   company: z.string().optional(),
   addressLine1: z.string().min(1),
   addressLine2: z.string().optional(),
@@ -188,12 +189,12 @@ async function calculateOrderTotals(items, couponCode = null) {
 // POST /api/ecommerce/orders - Créer commande
 // ============================================
 router.post('/', async (req, res, next) => {
-  const client = await db.pool.connect();
+  const client = await getPool().connect();
   
   try {
     const validated = createOrderSchema.parse(req.body);
     const userId = req.user?.id || null;
-    const guestEmail = validated.billingAddress.email || req.body.email;
+    const guestEmail = validated.billingAddress.email || req.body.billingAddress?.email || req.body.email || null;
 
     await client.query('BEGIN');
 
@@ -358,9 +359,9 @@ router.post('/', async (req, res, next) => {
 // ============================================
 // GET /api/ecommerce/orders - Liste commandes
 // ============================================
-router.get('/', verifyToken, async (req, res, next) => {
+router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const { status = '', page = '1', limit = '10' } = req.query;
 
     const pageNum = parseInt(page);
@@ -421,10 +422,10 @@ router.get('/', verifyToken, async (req, res, next) => {
 // ============================================
 // GET /api/ecommerce/orders/:orderNumber - Détail
 // ============================================
-router.get('/:orderNumber', async (req, res, next) => {
+router.get('/:orderNumber', optionalAuth, async (req, res, next) => {
   try {
     const { orderNumber } = req.params;
-    const userId = req.user?.id;
+    const userId = req.userId || req.user?.id;
 
     // Si non authentifié, permettre accès avec email
     const email = req.query.email;
@@ -495,11 +496,11 @@ router.get('/:orderNumber', async (req, res, next) => {
 // ============================================
 // PATCH /api/ecommerce/orders/:id/status - Modifier statut (admin)
 // ============================================
-router.patch('/:id/status', verifyToken, isAdmin, async (req, res, next) => {
+router.patch('/:id/status', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const validated = updateStatusSchema.parse(req.body);
-    const adminId = req.user.id;
+    const adminId = req.userId;
 
     // Récupérer commande actuelle
     const orderResult = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
@@ -565,12 +566,12 @@ router.patch('/:id/status', verifyToken, isAdmin, async (req, res, next) => {
 // ============================================
 // POST /api/ecommerce/orders/:id/cancel - Annuler commande
 // ============================================
-router.post('/:id/cancel', verifyToken, async (req, res, next) => {
-  const client = await db.pool.connect();
+router.post('/:id/cancel', requireAuth, async (req, res, next) => {
+  const client = await getPool().connect();
   
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userId;
     const { reason } = req.body;
 
     await client.query('BEGIN');
@@ -654,6 +655,44 @@ router.post('/:id/cancel', verifyToken, async (req, res, next) => {
     next(error);
   } finally {
     client.release();
+  }
+});
+
+/**
+ * GET /api/ecommerce/orders/my-orders
+ * Récupérer les commandes de l'utilisateur connecté
+ */
+router.get('/my-orders', requireAuth, async (req, res, next) => {
+  const pool = getPool();
+  
+  try {
+    const userId = req.userId;
+    
+    // Récupérer les commandes de l'utilisateur
+    const ordersResult = await pool.query(`
+      SELECT 
+        id,
+        order_number,
+        total_amount,
+        status,
+        payment_status,
+        shipping_status,
+        created_at,
+        updated_at,
+        billing_address,
+        shipping_address
+      FROM orders
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+    `, [userId]);
+    
+    res.json({
+      success: true,
+      orders: ordersResult.rows,
+    });
+  } catch (error) {
+    console.error('Erreur récupération commandes utilisateur:', error);
+    next(error);
   }
 });
 

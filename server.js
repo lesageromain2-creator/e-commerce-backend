@@ -41,6 +41,15 @@ const adminReservationsRoutes = require('./routes/admin/reservations');
 const adminDashboardRoutes = require('./routes/admin/dashboard');
 const adminHotelRoutes = require('./routes/admin/hotel');
 const messagesRoutes = require('./routes/admin/messages');
+const adminEcommerceStatsRoutes = require('./routes/admin/ecommerce-stats');
+const adminRolesRoutes = require('./routes/admin/roles');
+const adminNotificationsRoutes = require('./routes/admin/notifications');
+const adminInventoryRoutes = require('./routes/admin/inventory');
+const adminFinancesRoutes = require('./routes/admin/finances');
+const adminAnalyticsRoutes = require('./routes/admin/analytics');
+const adminCustomersRoutes = require('./routes/admin/customers');
+const adminSupportRoutes = require('./routes/admin/support');
+const dropshipperStatsRoutes = require('./routes/dropshipper/stats');
 const contactRoutes = require('./routes/contact');
 const projectFilesRouter = require('./routes/projectFiles');
 const paymentsRoutes = require('./routes/payments');
@@ -55,6 +64,9 @@ const cartRoutes = require('./routes/cart');
 const ecommerceOrdersRoutes = require('./routes/ecommerce-orders');
 const couponsRoutes = require('./routes/coupons');
 const chatbotRoutes = require('./routes/chatbot');
+const productReviewsRoutes = require('./routes/product-reviews');
+const stripeIntegrationRoutes = require('./routes/stripe-integration');
+const uploadProductRoutes = require('./routes/upload-product');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -261,7 +273,8 @@ pool.on('remove', (client) => {
 // ============================================
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false, // permet img src cross-origin (frontend :3000 -> API :5000/uploads)
 }));
 
 const globalLimiter = rateLimit({
@@ -278,6 +291,7 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   skipSuccessfulRequests: true,
+  skip: (req) => req.method === 'POST' && (req.path === '/logout' || req.originalUrl?.endsWith('/logout')),
   message: 'Trop de tentatives de connexion'
 });
 
@@ -453,6 +467,18 @@ app.use('/chat', chatRoutes);
 app.use('/hotel', hotelRoutes);
 
 // ============================================
+// UPLOAD PRODUITS (fichiers statiques + API)
+// ============================================
+// Middleware pour autoriser le chargement cross-origin des images (frontend sur :3000, API sur :5000)
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  next();
+});
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/upload', uploadProductRoutes);
+
+// ============================================
 // ROUTES E-COMMERCE
 // ============================================
 app.use('/products', productsRoutes);
@@ -461,6 +487,8 @@ app.use('/cart', cartRoutes);
 app.use('/ecommerce/orders', ecommerceOrdersRoutes);
 app.use('/coupons', couponsRoutes);
 app.use('/chatbot', chatbotRoutes);
+app.use('/reviews', productReviewsRoutes);
+app.use('/stripe', stripeIntegrationRoutes);
 
 // ============================================
 // ROUTES ADMIN
@@ -471,6 +499,19 @@ app.use('/admin/projects', adminProjectsRoutes);
 app.use('/admin/reservations', adminReservationsRoutes);
 app.use('/admin/dashboard', adminDashboardRoutes);
 app.use('/admin/hotel', adminHotelRoutes);
+app.use('/admin/ecommerce', adminEcommerceStatsRoutes);
+app.use('/admin/notifications', adminNotificationsRoutes);
+app.use('/admin/inventory', adminInventoryRoutes);
+app.use('/admin/finances', adminFinancesRoutes);
+app.use('/admin/analytics', adminAnalyticsRoutes);
+app.use('/admin/customers', adminCustomersRoutes);
+app.use('/admin/support', adminSupportRoutes);
+app.use('/admin', adminRolesRoutes);
+
+// ============================================
+// ROUTES DROPSHIPPER
+// ============================================
+app.use('/dropshipper', dropshipperStatsRoutes);
 
 // ============================================
 // GESTION ERREURS 404
@@ -529,57 +570,101 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================
-// DÉMARRAGE SERVEUR
+// DÉMARRAGE SERVEUR (avec fallback port si 5000 occupé)
 // ============================================
-// 0.0.0.0 requis pour Render / Heroku (écoute sur toutes les interfaces)
 const HOST = process.env.HOST || '0.0.0.0';
-const server = app.listen(PORT, HOST, () => {
-  console.log('');
-  console.log('╔══════════════════════════════════════╗');
-  console.log(`║  🚀 Serveur démarré (JWT MODE)       ║`);
-  console.log(`║  📍 Port: ${PORT}                      ║`);
-  console.log(`║  🌍 Environment: ${(process.env.NODE_ENV || 'development').padEnd(17)}║`);
-  console.log(`║  🔐 Auth: JWT Tokens                 ║`);
-  console.log(`║  🔗 URL: http://localhost:${PORT}       ║`);
-  console.log('╚══════════════════════════════════════╝');
-  console.log('');
-  console.log('📍 Routes principales:');
-  console.log('  GET  / - Status API');
-  console.log('  GET  /health - Health check détaillé');
-  console.log('  GET  /test-db - Test connexion BDD');
-  console.log('');
-  console.log('🔐 Auth:');
-  console.log('  POST /auth/login - Connexion');
-  console.log('  POST /auth/register - Inscription');
-  console.log('');
-  console.log('💰 Paiements:');
-  console.log('  POST /payments/intent - Créer Payment Intent');
-  console.log('  POST /payments/checkout-session - Créer Checkout Session');
-  console.log('  GET  /payments - Historique paiements');
-  console.log('');
-  console.log('🪝 Webhooks:');
-  console.log('  POST /webhooks/stripe - Webhook Stripe');
-  console.log('');
-  console.log('📚 Documentation API:');
-  console.log('  Voir: docs/API_CONTRACTS.md');
-  console.log('');
-});
+const PORT_MAX_TRY = 5010;
+let server = null;
+
+function startServer(port) {
+  return new Promise((resolve, reject) => {
+    const s = app.listen(port, HOST, () => {
+      const usedPort = s.address().port;
+      console.log('');
+      console.log('╔══════════════════════════════════════╗');
+      console.log(`║  🚀 Serveur démarré (JWT MODE)       ║`);
+      console.log(`║  📍 Port: ${String(usedPort).padEnd(25)}║`);
+      if (usedPort !== (parseInt(process.env.PORT, 10) || 5000)) {
+        console.log(`║  ⚠️  Port ${usedPort} (5000 occupé)        ║`);
+        console.log(`║  → Mettez NEXT_PUBLIC_API_URL=http://localhost:${usedPort} ║`);
+      }
+      console.log(`║  🌍 Environment: ${(process.env.NODE_ENV || 'development').padEnd(17)}║`);
+      console.log(`║  🔐 Auth: JWT Tokens                 ║`);
+      console.log(`║  🔗 URL: http://localhost:${usedPort}       ║`);
+      console.log('╚══════════════════════════════════════╝');
+      console.log('');
+      console.log('📍 Routes principales:');
+      console.log('  GET  / - Status API');
+      console.log('  GET  /health - Health check détaillé');
+      console.log('  GET  /test-db - Test connexion BDD');
+      console.log('');
+      console.log('🔐 Auth:');
+      console.log('  POST /auth/login - Connexion');
+      console.log('  POST /auth/register - Inscription');
+      console.log('');
+      console.log('💰 Paiements:');
+      console.log('  POST /payments/intent - Créer Payment Intent');
+      console.log('  POST /payments/checkout-session - Créer Checkout Session');
+      console.log('  GET  /payments - Historique paiements');
+      console.log('');
+      console.log('🪝 Webhooks:');
+      console.log('  POST /webhooks/stripe - Webhook Stripe');
+      console.log('');
+      console.log('📚 Documentation API:');
+      console.log('  Voir: docs/API_CONTRACTS.md');
+      console.log('');
+      resolve(s);
+    });
+    s.on('error', (err) => {
+      if (err.code === 'EADDRINUSE' && port < PORT_MAX_TRY) {
+        console.warn(`⚠️ Port ${port} occupé, tentative sur ${port + 1}...`);
+        startServer(port + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
+(async () => {
+  try {
+    server = await startServer(parseInt(PORT, 10) || 5000);
+  } catch (err) {
+    console.error('❌ Impossible de démarrer le serveur:', err.message);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`   Le port ${PORT} (et suivants jusqu'à ${PORT_MAX_TRY}) est déjà utilisé.`);
+      console.error('   Fermez l\'autre processus ou définissez PORT=5001 dans .env');
+    }
+    process.exit(1);
+  }
+})();
 
 // ============================================
 // ARRÊT GRACIEUX
 // ============================================
+const { getPool } = require('./database/db');
 const gracefulShutdown = () => {
   console.log('\n⏳ Arrêt du serveur...');
-  
+  let pool = null;
+  try {
+    pool = getPool();
+  } catch (_) {}
+  if (!server) {
+    if (pool) pool.end(() => process.exit(0));
+    else process.exit(0);
+    return;
+  }
   server.close(() => {
     console.log('✅ Serveur HTTP fermé');
-    
-    pool.end(() => {
-      console.log('✅ Pool DB fermé');
+    if (pool) {
+      pool.end(() => {
+        console.log('✅ Pool DB fermé');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
-  
   setTimeout(() => {
     console.error('⚠️ Arrêt forcé');
     process.exit(1);
